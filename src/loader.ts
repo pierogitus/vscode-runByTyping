@@ -1,23 +1,34 @@
 var mod = require('module');
 import path = require('path');
 import fs = require('fs');
+import * as trans from './transpile'
 
 export var moduleCache = {}
 export var contentCache = {}
 
 var modExtensions = { '.node': mod._extensions['.node'] }
 modExtensions['.js'] = (m, filename) => {
-    var content = contentCache[filename] !== undefined ? contentCache[filename] : fs.readFileSync(filename, 'utf8');
+    var content = contentCache[filename] !== undefined ? contentCache[filename] : readFileTranspile(filename)
+    contentCache[filename] = content
     m._compile(stripBOM(content), filename);
 }
 modExtensions['.json'] = (m, filename) => {
     var content = contentCache[filename] !== undefined ? contentCache[filename] : fs.readFileSync(filename, 'utf8');
+    contentCache[filename] = content
     try {
         m.exports = JSON.parse(stripBOM(content));
     } catch (err) {
         err.message = filename + ': ' + err.message;
         throw err;
     }
+}
+
+function readFileTranspile(fn: string): string {
+    var ts = fn.replace('.js', '.ts')
+    if (fs.existsSync(ts)) {
+        return trans.transpileModule(fs.readFileSync(ts, 'utf8'))
+    }
+    return fs.readFileSync(fn, 'utf8')
 }
 
 function _load(request, parent, isMain) {

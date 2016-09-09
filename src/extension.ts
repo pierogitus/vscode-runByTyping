@@ -6,9 +6,11 @@ import fs = require('fs');
 import * as trans from './transpile'
 
 var runOutput = ''
+var runOutputHtml = ''
 var scheme = 'runWhileTyping'
 var defaultCode = "exports.hello = 'hello world'"
 var outputUri = vscode.Uri.parse(scheme + '://a/runWhileTyping_exports')
+var outputUriHtml = vscode.Uri.parse(scheme + '://a/runWhileTyping_html')
 class ContentProvider implements vscode.TextDocumentContentProvider {
     private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     get onDidChange(): vscode.Event<vscode.Uri> {
@@ -16,12 +18,13 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
     }
     public update() {
         this._onDidChange.fire(outputUri);
+        this._onDidChange.fire(outputUriHtml);
     }
     dispose() {
         this._onDidChange.dispose();
     }
     provideTextDocumentContent(uri: vscode.Uri, token: vscode.CancellationToken): string {
-        return runOutput;
+        return uri.toString() == outputUri.toString() ? runOutput : runOutputHtml;
     }
 }
 var contentProvider = new ContentProvider()
@@ -29,7 +32,7 @@ var tsconfig
 export function activate(context: vscode.ExtensionContext) {
     var cp = vscode.workspace.registerTextDocumentContentProvider(scheme, contentProvider)
     var changeText = vscode.workspace.onDidChangeTextDocument(e => {
-        if (e.document.uri.toString() != outputUri.toString() && vscode.window.visibleTextEditors.some(x => x.document.uri.toString() == outputUri.toString())) {
+        if (e.document.uri.toString() != outputUri.toString() && e.document.uri.toString() != outputUriHtml.toString()) {
             if (vscode.workspace.rootPath) {
                 loader.contentCache[e.document.uri.fsPath.replace('.ts', '.js')] = trans.getFinalCode(e.document)
             }
@@ -75,8 +78,10 @@ export function activate(context: vscode.ExtensionContext) {
             })
             .then(te => { return vscode.workspace.openTextDocument(outputUri) })
             .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
+        vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two)
         run()
     });
+    vscode.commands.executeCommand
     context.subscriptions.push(mainCommand, cp, contentProvider, changeText, closeText);
 }
 
@@ -91,7 +96,9 @@ function run() {
     try {
         var sandbox = { requireMain: loader.requireMain }
         vm.runInNewContext('var m = requireMain("' + getMainPath().replace(/\\/g, '/') + '")', sandbox)
-        runOutput = stringifyCircular(sandbox['m']) || ''
+        var m = sandbox['m']
+        runOutputHtml = m.html
+        runOutput = stringifyCircular(m) || ''
     }
     catch (e) {
         runOutput = e.stack

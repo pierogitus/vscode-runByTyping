@@ -4,7 +4,7 @@ import path = require('path');
 
 var options: ts.TranspileOptions
 
-function transpileModule(code: string): string {
+export function transpileModule(code: string): string {
     var out = ts.transpileModule(code, options || { compilerOptions: { target: ts.ScriptTarget.ES2015, module: ts.ModuleKind.UMD } });
     return out.outputText
 }
