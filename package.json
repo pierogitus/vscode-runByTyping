@@ -1,7 +1,7 @@
 {
-    "name": "runwhiletyping",
-    "displayName": "Run While Typing",
-    "description": "Run While Typing",
+    "name": "runbytyping",
+    "displayName": "Run By Typing",
+    "description": "Run By Typing",
     "version": "0.0.1",
     "publisher": "Alex Thompson",
     "engines": {
@@ -11,13 +11,13 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.runWhileTyping"
+        "onCommand:extension.runByTyping"
     ],
     "main": "./out/src/extension",
     "contributes": {
         "commands": [{
-            "command": "extension.runWhileTyping",
-            "title": "Run While Typing"
+            "command": "extension.runByTyping",
+            "title": "Run By Typing"
         }]
     },
     "scripts": {

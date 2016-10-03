@@ -7,10 +7,10 @@ import * as trans from './transpile'
 
 var runOutput = ''
 var runOutputHtml = ''
-var scheme = 'runWhileTyping'
+var scheme = 'runByTyping'
 var defaultCode = "exports.hello = 'hello world'"
-var outputUri = vscode.Uri.parse(scheme + '://a/runWhileTyping_exports')
-var outputUriHtml = vscode.Uri.parse(scheme + '://a/runWhileTyping_html')
+var outputUri = vscode.Uri.parse(scheme + '://a/runByTyping_exports')
+var outputUriHtml = vscode.Uri.parse(scheme + '://a/runByTyping_html')
 class ContentProvider implements vscode.TextDocumentContentProvider {
     private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     get onDidChange(): vscode.Event<vscode.Uri> {
@@ -30,6 +30,7 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
 var contentProvider = new ContentProvider()
 var tsconfig
 export function activate(context: vscode.ExtensionContext) {
+    console.log('activate')
     var cp = vscode.workspace.registerTextDocumentContentProvider(scheme, contentProvider)
     var changeText = vscode.workspace.onDidChangeTextDocument(e => {
         if (e.document.uri.toString() != outputUri.toString() && e.document.uri.toString() != outputUriHtml.toString()) {
@@ -44,9 +45,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     })
     var closeText = vscode.workspace.onDidCloseTextDocument(e => {
+        console.log(e.uri.fsPath)
         delete loader.contentCache[e.uri.fsPath]
     })
-    let mainCommand = vscode.commands.registerCommand('extension.runWhileTyping', () => {
+    let mainCommand = vscode.commands.registerCommand('extension.runByTyping', () => {
         loader.contentCache = {}
         if (vscode.workspace.rootPath) {
             if (fs.existsSync(path.join(vscode.workspace.rootPath, 'tsconfig.json'))) {
@@ -71,21 +73,23 @@ export function activate(context: vscode.ExtensionContext) {
         else {
             mainUri = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document.uri : vscode.Uri.parse('untitled:' + path.join(__dirname, 'Untitled'))
         }
-        vscode.workspace.openTextDocument(mainUri)
-            .then(doc => {
-                loader.contentCache[getMainPath()] = trans.getFinalCode(doc)
-                vscode.window.showTextDocument(doc, vscode.ViewColumn.One, false)
-            })
-            .then(te => { return vscode.workspace.openTextDocument(outputUri) })
-            .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
-        vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two)
+        vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two).then(() => {
+            vscode.workspace.openTextDocument(mainUri)
+                .then(doc => {
+                    loader.contentCache[getMainPath()] = trans.getFinalCode(doc)
+                    vscode.window.showTextDocument(doc, vscode.ViewColumn.One, false)
+                })
+                .then(te => { return vscode.workspace.openTextDocument(outputUri) })
+                .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
+        })
         run()
     });
     vscode.commands.executeCommand
-    context.subscriptions.push(mainCommand, cp, contentProvider, changeText, closeText);
+    context.subscriptions.push(mainCommand, cp, changeText, closeText);
 }
 
 export function deactivate() {
+    console.log('deactivate')
 }
 function run() {
     loader.moduleCache = {}
@@ -97,7 +101,7 @@ function run() {
         var sandbox = { requireMain: loader.requireMain }
         vm.runInNewContext('var m = requireMain("' + getMainPath().replace(/\\/g, '/') + '")', sandbox)
         var m = sandbox['m']
-        runOutputHtml = m.html
+        runOutputHtml = m.html || ''
         runOutput = stringifyCircular(m) || ''
     }
     catch (e) {
@@ -121,5 +125,5 @@ function stringifyCircular(o): string {
     }, 2);
 }
 function getMainPath(): string {
-    return vscode.workspace.rootPath ? path.join(vscode.workspace.rootPath, 'runWhileTyping.js') : __filename
+    return vscode.workspace.rootPath ? path.join(vscode.workspace.rootPath, 'runByTyping.js') : __filename
 }
