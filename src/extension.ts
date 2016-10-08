@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import vm = require('vm');
-import * as loader from './loader'
+//import * as loader from './loader'
 import path = require('path');
 import fs = require('fs');
+import child = require('child_process')
 import * as trans from './transpile'
 
 var runOutput = ''
@@ -29,27 +30,39 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
 }
 var contentProvider = new ContentProvider()
 var tsconfig
+var childProcess: child.ChildProcess
 export function activate(context: vscode.ExtensionContext) {
     console.log('activate')
+    var op = { stdio: [0, 'pipe', 2, 'ipc'] }
+    childProcess = child.spawn('node', [path.join(__dirname, './child.js')], op)
+    console.log(childProcess.stdio)
+    childProcess.on('message', m => {
+        console.log(m)
+        if (m.type == 'done') {
+            runOutput = m.runOutput
+            runOutputHtml = m.runOutputHtml
+            contentProvider.update()
+        }
+    })
     var cp = vscode.workspace.registerTextDocumentContentProvider(scheme, contentProvider)
     var changeText = vscode.workspace.onDidChangeTextDocument(e => {
         if (e.document.uri.toString() != outputUri.toString() && e.document.uri.toString() != outputUriHtml.toString()) {
+            var content = {}
             if (vscode.workspace.rootPath) {
-                loader.contentCache[e.document.uri.fsPath.replace('.ts', '.js')] = trans.getFinalCode(e.document)
+                content[e.document.uri.fsPath.replace('.ts', '.js')] = trans.getFinalCode(e.document)
+                run(false, content)
             }
             else {
-                loader.contentCache = {}
-                loader.contentCache[getMainPath()] = trans.getFinalCode(e.document)
+                content[getMainPath()] = trans.getFinalCode(e.document)
+                run(true, content)
             }
-            run()
         }
     })
     var closeText = vscode.workspace.onDidCloseTextDocument(e => {
         console.log(e.uri.fsPath)
-        delete loader.contentCache[e.uri.fsPath]
     })
     let mainCommand = vscode.commands.registerCommand('extension.runByTyping', () => {
-        loader.contentCache = {}
+        var content = {}
         if (vscode.workspace.rootPath) {
             if (fs.existsSync(path.join(vscode.workspace.rootPath, 'tsconfig.json'))) {
                 tsconfig = require(path.join(vscode.workspace.rootPath, 'tsconfig.json').replace(/\\/g, '/'))
@@ -67,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
             var mainUri = vscode.Uri.file(mainPath)
             vscode.window.visibleTextEditors.filter(x => x.document.isDirty).forEach(x => {
-                loader.contentCache[x.document.uri.fsPath] = trans.getFinalCode(x.document)
+                content[x.document.uri.fsPath] = trans.getFinalCode(x.document)
             })
         }
         else {
@@ -76,54 +89,31 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two).then(() => {
             vscode.workspace.openTextDocument(mainUri)
                 .then(doc => {
-                    loader.contentCache[getMainPath()] = trans.getFinalCode(doc)
+                    content[getMainPath()] = trans.getFinalCode(doc)
+                    run(true, content)
                     vscode.window.showTextDocument(doc, vscode.ViewColumn.One, false)
                 })
                 .then(te => { return vscode.workspace.openTextDocument(outputUri) })
                 .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
         })
-        run()
     });
-    vscode.commands.executeCommand
     context.subscriptions.push(mainCommand, cp, changeText, closeText);
 }
 
 export function deactivate() {
     console.log('deactivate')
+    childProcess.kill()
 }
-function run() {
-    loader.moduleCache = {}
-    runOutput = ''
-    var timer = setTimeout(() => {
-        contentProvider.update()
-    }, 100)
-    try {
-        var sandbox = { requireMain: loader.requireMain }
-        vm.runInNewContext('var m = requireMain("' + getMainPath().replace(/\\/g, '/') + '")', sandbox)
-        var m = sandbox['m']
-        runOutputHtml = m.html || ''
-        runOutput = stringifyCircular(m) || ''
-    }
-    catch (e) {
-        runOutput = e.stack
-    }
-    clearTimeout(timer)
-    contentProvider.update()
-}
-function stringifyCircular(o): string {
-    var cache = [];
-    return JSON.stringify(o, function (key, value) {
-        if (typeof value === 'object' && value !== null) {
-            if (cache.indexOf(value) !== -1) {
-                // Circular reference found, discard key
-                return;
-            }
-            // Store value in our collection
-            cache.push(value);
-        }
-        return value;
-    }, 2);
-}
+
 function getMainPath(): string {
     return vscode.workspace.rootPath ? path.join(vscode.workspace.rootPath, 'runByTyping.js') : __filename
+}
+
+function run(clearContentCache: boolean, content: Object) {
+    var timer = setTimeout(() => {
+        //contentProvider.update()
+    }, 100)
+    childProcess.send({ type: 'run', mainPath: getMainPath(), clear: clearContentCache, content })
+
+    //clearTimeout(timer)
 }
