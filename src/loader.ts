@@ -44,6 +44,9 @@ function _load(request, parent, isMain) {
     module.require = function (path) {
         return _load(path, this, false);
     }
+    module['runByTypingDone'] = function (ob?: Object) {
+        process.send({ type: 'done', param: ob })
+    }
     if (isMain) {
         //process.mainModule = module;
         module.id = '.';
