@@ -7,7 +7,8 @@ import * as trans from './transpile'
 var runOutput = ''
 var runOutputHtml = ''
 var scheme = 'runByTyping'
-var defaultCode = "console.log('hello world')\n\n\nrequire.runByTypingDone()"
+var defaultCode = "console.log('hello world')\n\n\nmodule.runByTypingDone()"
+var defaultCodeTS = "console.log('hello world')\n\n\nmodule['runByTypingDone']()"
 var outputUri = vscode.Uri.parse(scheme + '://a/runByTyping_log')
 var outputUriHtml = vscode.Uri.parse(scheme + '://a/runByTyping_html')
 class ContentProvider implements vscode.TextDocumentContentProvider {
@@ -16,14 +17,18 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
         return this._onDidChange.event;
     }
     public update() {
-        this._onDidChange.fire(outputUri);
-        this._onDidChange.fire(outputUriHtml);
+        if (isEnabled) {
+            this._onDidChange.fire(outputUri);
+        }
+        if (isEnabledHTML) {
+            this._onDidChange.fire(outputUriHtml);
+        }
     }
     dispose() {
         this._onDidChange.dispose();
     }
     provideTextDocumentContent(uri: vscode.Uri, token: vscode.CancellationToken): string {
-        return uri.toString() == outputUri.toString() ? runOutput : runOutputHtml;
+        return uri.toString() == outputUri.toString() ? runOutput : (runOutputHtml || "No HTML value passed. Use this syntax:<br/><pre>module.runByTypingDone({ html: '&lt;div&gt;hello&lt;/div&gt;'})</pre>");
     }
 }
 var contentProvider = new ContentProvider()
@@ -34,15 +39,33 @@ var waitTimer
 var isRunning = false
 var isWaiting: runParams = null
 var isRunningLong = false
+var isEnabled = false
+var isEnabledHTML = false
 interface runParams {
     clearContentCache: boolean, content: Object
 }
 export function activate(context: vscode.ExtensionContext) {
-    console.log('activate')
     createChild()
     var cp = vscode.workspace.registerTextDocumentContentProvider(scheme, contentProvider)
+
+    let mainCommand = vscode.commands.registerCommand('extension.enableRunByTyping', () => {
+        isEnabled = true
+        setup().then(te => { return vscode.workspace.openTextDocument(outputUri) })
+            .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
+    });
+    let htmlCommand = vscode.commands.registerCommand('extension.enableRunByTypingHtml', () => {
+        isEnabledHTML = true
+        setup().then(te => vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two))
+    });
+    let disableCommand = vscode.commands.registerCommand('extension.disableRunByTyping', () => {
+        isEnabled = false
+        isEnabledHTML = false
+        if (childProcess) {
+            childProcess.kill()
+        }
+    })
     var changeText = vscode.workspace.onDidChangeTextDocument(e => {
-        if (e.document.uri.toString() != outputUri.toString() && e.document.uri.toString() != outputUriHtml.toString()) {
+        if (e.document.uri.toString() != outputUri.toString() && e.document.uri.toString() != outputUriHtml.toString() && (isEnabled || isEnabledHTML)) {
             var content = {}
             if (vscode.workspace.rootPath) {
                 content[e.document.uri.fsPath.replace('.ts', '.js')] = trans.getFinalCode(e.document)
@@ -54,46 +77,43 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
     })
-    var closeText = vscode.workspace.onDidCloseTextDocument(e => {
-        console.log(e.uri.fsPath)
-    })
-    let mainCommand = vscode.commands.registerCommand('extension.runByTyping', () => {
-        var content = {}
-        if (vscode.workspace.rootPath) {
-            if (fs.existsSync(path.join(vscode.workspace.rootPath, 'tsconfig.json'))) {
-                tsconfig = require(path.join(vscode.workspace.rootPath, 'tsconfig.json').replace(/\\/g, '/'))
-                trans.setOptions(tsconfig.compilerOptions)
-            }
-            var mainPath = getMainPath()
-            if (tsconfig) {
-                if (!fs.existsSync(mainPath)) {
-                    fs.writeFileSync(mainPath, defaultCode)
-                }
-                mainPath = mainPath.replace('.js', '.ts')
-            }
-            if (!fs.existsSync(mainPath)) {
-                fs.writeFileSync(mainPath, defaultCode)
-            }
-            var mainUri = vscode.Uri.file(mainPath)
-        }
-        else {
-            mainUri = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document.uri : vscode.Uri.parse('untitled:' + path.join(__dirname, 'Untitled'))
-        }
-        vscode.workspace.openTextDocument(mainUri)
-            .then(doc => {
-                content[getMainPath()] = trans.getFinalCode(doc)
-                run({ clearContentCache: true, content: content })
-                vscode.window.showTextDocument(doc, vscode.ViewColumn.One, false)
-            })
-            .then(te => { return vscode.workspace.openTextDocument(outputUri) })
-            .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
-    });
-    context.subscriptions.push(mainCommand, cp, changeText, closeText);
+    context.subscriptions.push(mainCommand, htmlCommand, disableCommand, cp, changeText);
 }
 
 export function deactivate() {
-    console.log('deactivate')
+    isEnabled = false
+    isEnabledHTML = false
     childProcess.kill()
+}
+
+function setup(): PromiseLike<void> {
+    if (vscode.workspace.rootPath) {
+        if (fs.existsSync(path.join(vscode.workspace.rootPath, 'tsconfig.json'))) {
+            tsconfig = require(path.join(vscode.workspace.rootPath, 'tsconfig.json').replace(/\\/g, '/'))
+            trans.setOptions(tsconfig.compilerOptions)
+        }
+        var mainPath = getMainPath()
+        if (tsconfig) {
+            if (!fs.existsSync(mainPath)) {
+                fs.writeFileSync(mainPath, defaultCodeTS)
+            }
+            mainPath = mainPath.replace('.js', '.ts')
+        }
+        if (!fs.existsSync(mainPath)) {
+            fs.writeFileSync(mainPath, defaultCode)
+        }
+        var mainUri = vscode.Uri.file(mainPath)
+    }
+    else {
+        mainUri = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document.uri : vscode.Uri.parse('untitled:' + path.join(__dirname, 'Untitled'))
+    }
+    return vscode.workspace.openTextDocument(mainUri)
+        .then(doc => {
+            var content = {}
+            content[getMainPath()] = trans.getFinalCode(doc)
+            run({ clearContentCache: true, content: content })
+            vscode.window.showTextDocument(doc, vscode.ViewColumn.One, false)
+        })
 }
 
 function getMainPath(): string {
@@ -116,12 +136,6 @@ function createChild() {
             clearTimeout(waitTimer)
             if (m.param && m.param.html) {
                 runOutputHtml = m.param.html
-                vscode.commands.executeCommand('vscode.previewHtml', outputUriHtml, vscode.ViewColumn.Two)
-            }
-            else {
-                if (!vscode.window.visibleTextEditors.some(x => x.document.uri.toString() == outputUri.toString())) {
-                    vscode.workspace.openTextDocument(outputUri).then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Two, true))
-                }
             }
             isRunning = false
             isRunningLong = false
@@ -175,6 +189,12 @@ function execRun(arg: runParams) {
     runOutputHtml = ''
     isRunning = true
     isRunningLong = false
+    if (Object.keys(arg.content).some(x => x == getMainPath())) {
+        var m: string = arg.content[getMainPath()]
+        if (!m.includes("module.runByTypingDone(") && !m.includes("module['runByTypingDone'](")) {
+            runOutput = '******* Warning: use module.runByTypingDone() to signal execution has finished.\n******* This increases performance by reusing the worker process.\n'
+        }
+    }
     childProcess.send({ type: 'run', mainPath: getMainPath(), clear: arg.clearContentCache, content: arg.content })
     isWaiting = null
     clearScreenTimer = setTimeout(() => {

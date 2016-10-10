@@ -11,14 +11,25 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.runByTyping"
+        "onCommand:extension.enableRunByTyping",
+        "onCommand:extension.enableRunByTypingHtml"
     ],
     "main": "./out/src/extension",
     "contributes": {
-        "commands": [{
-            "command": "extension.runByTyping",
-            "title": "Run By Typing"
-        }]
+        "commands": [
+            {
+                "command": "extension.enableRunByTyping",
+                "title": "Enable Run By Typing"
+            },
+            {
+                "command": "extension.enableRunByTypingHtml",
+                "title": "Enable Run By Typing HTML Preview"
+            },
+            {
+                "command": "extension.disableRunByTyping",
+                "title": "Disable Run By Typing"
+            }
+        ]
     },
     "scripts": {
         "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
