@@ -20,6 +20,8 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
         if (isEnabled) {
             this._onDidChange.fire(outputUri);
         }
+    }
+    public updateHTML() {
         if (isEnabledHTML) {
             this._onDidChange.fire(outputUriHtml);
         }
@@ -28,7 +30,7 @@ class ContentProvider implements vscode.TextDocumentContentProvider {
         this._onDidChange.dispose();
     }
     provideTextDocumentContent(uri: vscode.Uri, token: vscode.CancellationToken): string {
-        return uri.toString() == outputUri.toString() ? runOutput : (runOutputHtml || "No HTML value passed. Use this syntax:<br/><pre>module.runByTypingDone({ html: '&lt;div&gt;hello&lt;/div&gt;'})</pre>");
+        return uri.toString() == outputUri.toString() ? runOutput : (runOutputHtml || "No HTML value passed. Example usage:<br/><pre>module.runByTypingDone({ html: '&lt;div&gt;hello&lt;/div&gt;'})</pre>");
     }
 }
 var contentProvider = new ContentProvider()
@@ -144,6 +146,7 @@ function createChild() {
                 run(isWaiting)
             }
             contentProvider.update()
+            contentProvider.updateHTML()
         }
     })
     var content = {}
@@ -199,6 +202,7 @@ function execRun(arg: runParams) {
     isWaiting = null
     clearScreenTimer = setTimeout(() => {
         contentProvider.update()
+        contentProvider.updateHTML()
     }, 200)
     waitTimer = setTimeout(function () {
         if (isRunning) {
