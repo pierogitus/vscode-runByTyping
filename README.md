@@ -1,65 +1,29 @@
-# autorun README
+# Run By Typing
 
-This is the README for your extension "autorun". After writing up a brief description, we recommend including the following sections.
+An extension for Visual Studio Code that executes NodeJS/TypeScript and shows real-time results while editing files.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### **Command: Enable Run By Typing**
 
-For example if there is an image subfolder under your extension project workspace:
+Creates or opens runByTyping.js in the current workspace and executes it when any open file is edited. Console results are displayed in a separate log window. 
 
-\!\[feature X\]\(images/feature-x.png\)
+### **Command: Enable Run By Typing HTML Preview**
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+Creates or opens runByTyping.js in the current workspace and executes it when any open file is edited. Raw HTML passed to module.runByTypingDone() is displayed in the HTML preview window.
 
-## Requirements
+### **Command: Disable Run By Typing**
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+Disables executing runByTyping.js on edits.
 
-## Extension Settings
+## How it works
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+The code is executed in a separte process so the editor remains responive. Calling module.runByTypingDone() signals that the process can be reused for the next run so a new process doesn't have to be created on every keystroke. If the code doesn't call module.runByTypingDone() within 500ms and there are new changes pending the process will be recycled to begin the next run. This way every run has a clean global scope and even infinite loops are handled gracefully.
 
-For example:
+## Source
 
-This extension contributes the following settings:
+[GitHub](https://github.com/pierogitus/vscode-runByTyping)
 
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+## License
 
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
------------------------------------------------------------------------------------------------------------
-
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on OSX or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on OSX or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (OSX) to see a list of Markdown snippets
-
-### For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+[MIT](https://raw.githubusercontent.com/pierogitus/vscode-runByTyping/master/LICENSE)

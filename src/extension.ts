@@ -47,7 +47,6 @@ interface runParams {
     clearContentCache: boolean, content: Object
 }
 export function activate(context: vscode.ExtensionContext) {
-    createChild()
     var cp = vscode.workspace.registerTextDocumentContentProvider(scheme, contentProvider)
 
     let mainCommand = vscode.commands.registerCommand('extension.enableRunByTyping', () => {
@@ -89,20 +88,26 @@ export function deactivate() {
 }
 
 function setup(): PromiseLike<void> {
+    if (childProcess) {
+        childProcess.kill()
+    }
+    createChild()
     if (vscode.workspace.rootPath) {
         if (fs.existsSync(path.join(vscode.workspace.rootPath, 'tsconfig.json'))) {
             tsconfig = require(path.join(vscode.workspace.rootPath, 'tsconfig.json').replace(/\\/g, '/'))
             trans.setOptions(tsconfig.compilerOptions)
         }
         var mainPath = getMainPath()
+        var code = defaultCode
         if (tsconfig) {
+            code = defaultCodeTS
             if (!fs.existsSync(mainPath)) {
-                fs.writeFileSync(mainPath, defaultCodeTS)
+                fs.writeFileSync(mainPath, code)
             }
             mainPath = mainPath.replace('.js', '.ts')
         }
         if (!fs.existsSync(mainPath)) {
-            fs.writeFileSync(mainPath, defaultCode)
+            fs.writeFileSync(mainPath, code)
         }
         var mainUri = vscode.Uri.file(mainPath)
     }
