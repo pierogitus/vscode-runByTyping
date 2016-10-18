@@ -1,5 +1,15 @@
-console.log(30*95*40.123)
-console.log(52*7)
+var s = 'hello, world'
+console.log(s.substr(s.indexOf(','), 4))
+
+
+// var ex1 = require('./test/example1')
+// console.log(ex1.getData(333))
+
+
+// console.log(ex1.slow())
+
+
+// module['runByTypingDone']({ html: ex1.page() })
 
 
 module['runByTypingDone']()

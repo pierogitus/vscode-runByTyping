@@ -7,6 +7,7 @@ import * as trans from './transpile'
 var runOutput = ''
 var runOutputHtml = ''
 var scheme = 'runByTyping'
+var doneMarker = 'runByTypingDone'
 var defaultCode = "console.log('hello world')\n\n\nmodule.runByTypingDone()"
 var defaultCodeTS = "console.log('hello world')\n\n\nmodule['runByTypingDone']()"
 var outputUri = vscode.Uri.parse(scheme + '://a/runByTyping_log')
@@ -126,15 +127,22 @@ function setup(): PromiseLike<void> {
 function getMainPath(): string {
     return vscode.workspace.rootPath ? path.join(vscode.workspace.rootPath, 'runByTyping.js') : __filename
 }
-
+function appendOutput(s: string) {
+    if (runOutput.indexOf(doneMarker) == runOutput.length - doneMarker.length) {
+        runOutput = runOutput.substring(0, runOutput.indexOf(doneMarker)) + s + doneMarker
+    }
+    else {
+        runOutput += s
+    }
+}
 function createChild() {
     childProcess = child.spawn('node', [path.join(__dirname, './child.js')], { stdio: [0, 'pipe', 'pipe', 'ipc'] })
     childProcess.stdout.on('data', d => {
-        runOutput += d
+        appendOutput(d)
         contentProvider.update()
     })
     childProcess.stderr.on('data', d => {
-        runOutput += d
+        appendOutput(d)
         contentProvider.update()
     })
     childProcess.on('message', m => {
@@ -146,12 +154,12 @@ function createChild() {
             }
             isRunning = false
             isRunningLong = false
-            runOutput += 'runByTypingDone'
+            runOutput += doneMarker
+            contentProvider.update()
+            contentProvider.updateHTML()
             if (isWaiting) {
                 run(isWaiting)
             }
-            contentProvider.update()
-            contentProvider.updateHTML()
         }
     })
     var content = {}
