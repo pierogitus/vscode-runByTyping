@@ -161,8 +161,8 @@ function createChild() {
         appendOutput(d.toString())
     })
     var content = {}
-    vscode.window.visibleTextEditors.filter(x => x.document.isDirty).forEach(x => {
-        content[x.document.uri.fsPath] = trans.getFinalCode(x.document)
+    vscode.workspace.textDocuments.filter(x => x.isDirty).forEach(x => {
+        content[x.uri.fsPath.replace('.ts', '.js')] = trans.getFinalCode(x)
     })
     childProcess.send({ type: 'init', content })
 }
