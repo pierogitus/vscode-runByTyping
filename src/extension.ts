@@ -3,11 +3,11 @@ import path = require('path');
 import fs = require('fs');
 import child = require('child_process')
 import * as trans from './transpile'
+import * as loader from './loader'
 
 var runOutput = ''
 var runOutputHtml = ''
 var scheme = 'runByTyping'
-var doneMarker = 'runByTypingDone'
 var defaultCode = "console.log('hello world')\n\n\nmodule.runByTypingDone()"
 var defaultCodeTS = "console.log('hello world')\n\n\nmodule['runByTypingDone']()"
 var outputUri = vscode.Uri.parse(scheme + '://a/runByTyping_log')
@@ -129,8 +129,21 @@ function getMainPath(): string {
     return vscode.workspace.rootPath ? path.join(vscode.workspace.rootPath, 'runByTyping.js') : __filename
 }
 function appendOutput(s: string) {
-    if (runOutput.indexOf(doneMarker) == runOutput.length - doneMarker.length) {
-        runOutput = runOutput.substring(0, runOutput.indexOf(doneMarker)) + s + doneMarker
+    if (s.indexOf(loader.doneMarker) >= 0) {
+        clearTimeout(clearScreenTimer)
+        clearTimeout(waitTimer)
+        if (s.substr(s.indexOf(loader.doneMarker) + loader.doneMarker.length, 7) == '{"html"') {
+            runOutputHtml = JSON.parse(s.substring(s.indexOf(loader.doneMarker) + loader.doneMarker.length, s.indexOf('\n', s.indexOf(loader.doneMarker)))).html
+        }
+        isRunning = false
+        isRunningLong = false
+        isDelayVisual = false
+        runOutput += s
+        contentProvider.update()
+        contentProvider.updateHTML()
+        if (isWaiting) {
+            run(isWaiting)
+        }
     }
     else {
         runOutput += s
@@ -142,28 +155,10 @@ function appendOutput(s: string) {
 function createChild() {
     childProcess = child.spawn('node', [path.join(__dirname, './child.js')], { stdio: [0, 'pipe', 'pipe', 'ipc'] })
     childProcess.stdout.on('data', d => {
-        appendOutput(d)
+        appendOutput(d.toString())
     })
     childProcess.stderr.on('data', d => {
-        appendOutput(d)
-    })
-    childProcess.on('message', m => {
-        if (m.type == 'done') {
-            clearTimeout(clearScreenTimer)
-            clearTimeout(waitTimer)
-            if (m.param && m.param.html) {
-                runOutputHtml = m.param.html
-            }
-            isRunning = false
-            isRunningLong = false
-            isDelayVisual = false
-            runOutput += doneMarker
-            contentProvider.update()
-            contentProvider.updateHTML()
-            if (isWaiting) {
-                run(isWaiting)
-            }
-        }
+        appendOutput(d.toString())
     })
     var content = {}
     vscode.window.visibleTextEditors.filter(x => x.document.isDirty).forEach(x => {

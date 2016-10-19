@@ -5,7 +5,7 @@ exports.getData = function (d) {
 
 exports.slow = function() {
     var r = 0
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 10000; i++) {
         r += Math.sqrt(i) 
     }
     return r

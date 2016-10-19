@@ -5,6 +5,7 @@ import * as trans from './transpile'
 
 export var moduleCache = {}
 export var contentCache = {}
+export var doneMarker = '***runByTypingDone***'
 
 var modExtensions = { '.node': mod._extensions['.node'] }
 modExtensions['.js'] = (m, filename) => {
@@ -45,7 +46,7 @@ function _load(request, parent, isMain) {
         return _load(path, this, false);
     }
     module['runByTypingDone'] = function (ob?: Object) {
-        process.send({ type: 'done', param: ob })
+        console.log(doneMarker + (ob ? JSON.stringify(ob) : ''))
     }
     if (isMain) {
         //process.mainModule = module;

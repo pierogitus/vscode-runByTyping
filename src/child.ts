@@ -36,6 +36,6 @@ function run(mainPath: string) {
     }
     catch (e) {
         console.log(e.stack)
-        process.send({ type: 'done', param: { html: '<pre>' + e.stack + '</pre>' } })
+        console.log(loader.doneMarker)
     }
 }
