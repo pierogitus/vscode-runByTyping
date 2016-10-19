@@ -3,7 +3,7 @@ console.log(s.substr(s.indexOf(','), 4))
 
 
 // var ex1 = require('./test/example1')
-// console.log(ex1.getData(333))
+// console.log(ex1.getData(3))
 
 
 // console.log(ex1.slow())

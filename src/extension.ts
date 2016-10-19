@@ -44,6 +44,7 @@ var isWaiting: runParams = null
 var isRunningLong = false
 var isEnabled = false
 var isEnabledHTML = false
+var isDelayVisual = false
 interface runParams {
     clearContentCache: boolean, content: Object
 }
@@ -134,16 +135,17 @@ function appendOutput(s: string) {
     else {
         runOutput += s
     }
+    if (!isDelayVisual) {
+        contentProvider.update()
+    }
 }
 function createChild() {
     childProcess = child.spawn('node', [path.join(__dirname, './child.js')], { stdio: [0, 'pipe', 'pipe', 'ipc'] })
     childProcess.stdout.on('data', d => {
         appendOutput(d)
-        contentProvider.update()
     })
     childProcess.stderr.on('data', d => {
         appendOutput(d)
-        contentProvider.update()
     })
     childProcess.on('message', m => {
         if (m.type == 'done') {
@@ -154,6 +156,7 @@ function createChild() {
             }
             isRunning = false
             isRunningLong = false
+            isDelayVisual = false
             runOutput += doneMarker
             contentProvider.update()
             contentProvider.updateHTML()
@@ -213,7 +216,9 @@ function execRun(arg: runParams) {
     }
     childProcess.send({ type: 'run', mainPath: getMainPath(), clear: arg.clearContentCache, content: arg.content })
     isWaiting = null
+    isDelayVisual = true
     clearScreenTimer = setTimeout(() => {
+        isDelayVisual = false
         contentProvider.update()
         contentProvider.updateHTML()
     }, 200)
